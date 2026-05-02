@@ -2,12 +2,12 @@
 import os
 import sqlite3
 from datetime import datetime, timedelta
-from flask import Flask, jsonify, request, send_from_directory, session
+from flask import Flask, jsonify, request, render_template, session
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 
 DB_FILE = 'finance.db'
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 CORS(app)
 
@@ -281,7 +281,7 @@ def check_auth():
 @app.route('/', methods=['GET'])
 def index():
     """Serve the dashboard HTML."""
-    return send_from_directory(os.path.abspath(os.path.dirname(__file__)), 'personal_finance_dashboard.html')
+    return render_template('index.html')
 
 @app.route('/api/overview', methods=['GET'])
 def overview():
