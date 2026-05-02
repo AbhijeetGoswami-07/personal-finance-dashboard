@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Personal Finance Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f2f4f7;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --card: rgba(255, 255, 255, 0.9);
+      --border: #e5e7eb;
+      --primary: #2563eb;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+    }
+
+    [data-theme='dark'] {
+      --bg: #111827;
+      --panel: #1f2937;
+      --text: #f9fafb;
+      --muted: #9ca3af;
+      --card: rgba(30, 41, 59, 0.94);
+      --border: #374151;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+    }
+
+    [data-theme='ocean'] {
+      --bg: #e0f2fe;
+      --panel: #dbeafe;
+      --text: #0f172a;
+      --muted: #475569;
+      --card: rgba(219, 234, 254, 0.95);
+      --border: #bfdbfe;
+      --primary: #0ea5e9;
+      --success: #0f766e;
+      --danger: #be123c;
+      --shadow: 0 18px 60px rgba(14, 165, 233, 0.15);
+    }
+
+    [data-theme='sunset'] {
+      --bg: #fff7ed;
+      --panel: #ffedd5;
+      --text: #7c2d12;
+      --muted: #92400e;
+      --card: rgba(255, 247, 237, 0.95);
+      --border: #fed7aa;
+      --primary: #ea580c;
+      --success: #166534;
+      --danger: #b91c1c;
+      --shadow: 0 18px 50px rgba(234, 88, 12, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(180deg, var(--bg) 0%, #e5e7eb 100%);
+      color: var(--text);
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      min-height: 100vh;
+    }
+
+    .sidebar-collapsed .app {
+      grid-template-columns: 86px 1fr;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      box-shadow: var(--shadow);
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .brand-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.35rem;
+      letter-spacing: -0.02em;
+    }
+
+    .brand p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .collapse-btn {
+      border: none;
+      background: rgba(37, 99, 235, 0.1);
+      color: var(--primary);
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      cursor: pointer;
+      font-size: 1.05rem;
+      display: grid;
+      place-items: center;
+    }
+
+    .sidebar-collapsed .sidebar {
+      width: 86px;
+      min-width: 86px;
+      padding-left: 16px;
+      padding-right: 16px;
+    }
+
+    .sidebar-collapsed .brand p,
+    .sidebar-collapsed .sidebar-bottom,
+    .sidebar-collapsed .toggle-card label span,
+    .sidebar-collapsed .nav-link .label,
+    .sidebar-collapsed .nav-link .arrow {
+      display: none;
+    }
+
+    .sidebar-collapsed .brand-top {
+      justify-content: center;
+    }
+
+    .sidebar-collapsed .brand-top > div {
+      display: none;
+    }
+
+    .sidebar-collapsed .nav-link {
+      justify-content: center;
+      padding: 14px 0;
+      min-height: 52px;
+      position: relative;
+    }
+
+    .sidebar-collapsed .nav-link::before {
+      content: attr(data-short);
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--primary);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+
+    .sidebar-collapsed .nav-left {
+      justify-content: center;
+      width: 100%;
+    }
+
+    .sidebar-collapsed .sidebar {
+      overflow: hidden;
+    }
+
+    .nav-links {
+      display: grid;
+      gap: 10px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-radius: 18px;
+      background: rgba(37, 99, 235, 0.1);
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+
+    .nav-link:hover {
+      transform: translateX(3px);
+    }
+
+    .nav-link span {
+      display: inline-flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .nav-left {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-link .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+
+    .sidebar-bottom {
+      margin-top: auto;
+      display: grid;
+      gap: 16px;
+    }
+
+    .toggle-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px;
+      border-radius: 18px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .toggle-card label {
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 46px;
+      height: 26px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: #d1d5db;
+      border-radius: 999px;
+      transition: background 0.25s ease;
+    }
+
+    .slider::before {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 4px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: white;
+      transition: transform 0.25s ease;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+    }
+
+    .toggle-switch input:checked + .slider {
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+    }
+
+    .toggle-switch input:checked + .slider::before {
+      transform: translateX(20px);
+    }
+
+    .main {
+      padding: 32px;
+      display: grid;
+      gap: 24px;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .page-header h2 {
+      margin: 0;
+      font-size: 1.8rem;
+    }
+
+    .page-header p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 640px;
+      line-height: 1.6;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      padding: 26px;
+      backdrop-filter: blur(14px);
+    }
+
+    .scorecards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .scorecard {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .scorecard small {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .scorecard h3 {
+      margin: 0;
+      font-size: 2.3rem;
+      letter-spacing: -0.03em;
+    }
+
+    .scorecard .positive {
+      color: var(--success);
+    }
+
+    .scorecard .negative {
+      color: var(--danger);
+    }
+
+    .chart-card {
+      display: grid;
+      gap: 14px;
+    }
+
+    .chart-card h4,
+    .table-card h4,
+    .progress-card h4,
+    .embed-card h4,
+    .card h4 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+      color: var(--text);
+    }
+
+    .chart-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .chart-widget {
+      background: var(--panel);
+      border-radius: 22px;
+      padding: 22px;
+      border: 1px solid var(--border);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+    }
+
+    .chart-widget .subtitle {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 16px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .chart-widget canvas {
+      width: 100% !important;
+      min-height: 260px;
+      height: auto !important;
+    }
+
+    #donutThisMonth,
+    #donutLastMonth {
+      aspect-ratio: 1 / 1;
+    }
+
+    #categoryCompareChart,
+    #areaTrend {
+      aspect-ratio: 16 / 9;
+      min-height: 280px;
+    }
+
+    .table-card table,
+    .card table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 0.95rem;
+    }
+
+    .table-card th,
+    .table-card td,
+    .card th,
+    .card td {
+      padding: 16px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .table-card th,
+    .card th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .table-card tr:last-child td {
+      border-bottom: none;
+    }
+
+    .account-name {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .account-chip {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #2563eb;
+    }
+
+    .progress-card {
+      display: grid;
+      gap: 18px;
+    }
+
+    .budget-row {
+      display: grid;
+      gap: 10px;
+    }
+
+    .budget-row p {
+      margin: 0;
+      display: flex;
+      justify-content: space-between;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .progress {
+      width: 100%;
+      height: 12px;
+      border-radius: 999px;
+      background: var(--border);
+      overflow: hidden;
+    }
+
+    .progress > span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #2563eb 0%, #60a5fa 100%);
+    }
+
+    .trend-layout {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 24px;
+    }
+
+    .embed-card {
+      overflow: hidden;
+    }
+
+    .embed-card iframe {
+      width: 100%;
+      min-height: 340px;
+      aspect-ratio: 16 / 9;
+      border: none;
+      border-radius: 22px;
+      background: var(--panel);
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .stat-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 16px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.1);
+      color: var(--primary);
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .filter-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .filter-controls select,
+    .filter-controls input {
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 10px;
+      background: var(--panel);
+      color: var(--text);
+    }
+
+    .amt-credit {
+      color: var(--success);
+      font-weight: 600;
+    }
+
+    .amt-debit {
+      color: var(--danger);
+      font-weight: 600;
+    }
+
+    @media (max-width: 1100px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: relative;
+        height: auto;
+        border-right: none;
+      }
+
+      .main {
+        padding: 24px;
+      }
+
+      .grid-2,
+      .grid-3,
+      .trend-layout,
+      .chart-inner,
+      .stats-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .sidebar {
+        padding: 22px 18px;
+      }
+
+      .main {
+        padding: 20px 16px;
+      }
+
+      .nav-link {
+        padding: 14px 16px;
+      }
+
+      .scorecard h3 {
+        font-size: 2rem;
+      }
+    }
+
+    /* Auth Styles */
+    .auth-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%);
+      font-family: 'Inter', sans-serif;
+    }
+
+    .auth-card {
+      background: var(--panel);
+      border-radius: 20px;
+      padding: 48px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+    }
+
+    .auth-card h1 {
+      margin: 0 0 8px 0;
+      font-size: 1.75rem;
+      color: var(--text);
+      text-align: center;
+    }
+
+    .auth-tab-content {
+      display: none;
+    }
+
+    .auth-tab-content.active {
+      display: block;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      font-family: 'Inter', sans-serif;
+      font-size: 1rem;
+      background: var(--panel);
+      color: var(--text);
+      transition: border-color 0.2s;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .auth-btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .auth-btn:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body data-theme="light">
+  <div id="authContainer" class="auth-container">
+    <div class="auth-card">
+      <h1>Finance Studio</h1>
+      <p style="color: var(--muted); text-align: center; margin-bottom: 32px;">Personal Finance Dashboard</p>
+      
+      <div id="loginTab" class="auth-tab-content active">
+        <form id="loginForm" onsubmit="handleLogin(event)">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="loginUsername" name="username" required placeholder="Enter your username" />
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="loginPassword" name="password" required placeholder="Enter your password" />
+          </div>
+          <button type="submit" class="auth-btn">Login</button>
+          <p id="loginError" style="color: var(--danger); text-align: center; margin-top: 12px; font-size: 0.9rem;"></p>
+        </form>
+        <p style="text-align: center; margin-top: 16px; color: var(--muted);">
+          Don't have an account? <a href="#" onclick="switchToRegister(event)" style="color: var(--primary); text-decoration: none; font-weight: 600;">Register here</a>
+        </p>
+        <p style="text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.9rem;">
+          <strong>Demo Account:</strong><br/>Username: demo<br/>Password: demo123
+        </p>
+      </div>
+
+      <div id="registerTab" class="auth-tab-content">
+        <form id="registerForm" onsubmit="handleRegister(event)">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="registerUsername" name="username" required placeholder="Choose a username" />
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="registerPassword" name="password" required placeholder="At least 6 characters" />
+          </div>
+          <div class="form-group">
+            <label>Confirm Password</label>
+            <input type="password" id="registerConfirm" name="confirm" required placeholder="Confirm your password" />
+          </div>
+          <button type="submit" class="auth-btn">Register</button>
+          <p id="registerError" style="color: var(--danger); text-align: center; margin-top: 12px; font-size: 0.9rem;"></p>
+        </form>
+        <p style="text-align: center; margin-top: 16px; color: var(--muted);">
+          Already have an account? <a href="#" onclick="switchToLogin(event)" style="color: var(--primary); text-decoration: none; font-weight: 600;">Login here</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="app" id="mainApp" style="display: none;">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-top">
+          <div>
+            <h1>Finance Studio</h1>
+            <p>Personal finance reporting with analytics, budgets, and accounts.</p>
+          </div>
+          <button id="sidebarToggle" class="collapse-btn" aria-label="Collapse sidebar">☰</button>
+        </div>
+      </div>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#overview" class="nav-link" data-short="O">
+          <span class="nav-left"><span class="dot"></span><span class="label">Overview</span></span>
+          <span class="arrow">→</span>
+        </a>
+        <a href="#transactions" class="nav-link" data-short="T">
+          <span class="nav-left"><span class="dot"></span><span class="label">Transactions</span></span>
+          <span class="arrow">→</span>
+        </a>
+        <a href="#accounts" class="nav-link" data-short="A">
+          <span class="nav-left"><span class="dot"></span><span class="label">Accounts</span></span>
+          <span class="arrow">→</span>
+        </a>
+        <a href="#budgets" class="nav-link" data-short="B">
+          <span class="nav-left"><span class="dot"></span><span class="label">Budgets</span></span>
+          <span class="arrow">→</span>
+        </a>
+        <a href="#settings" class="nav-link" data-short="S">
+          <span class="nav-left"><span class="dot"></span><span class="label">Settings</span></span>
+          <span class="arrow">→</span>
+        </a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="toggle-card">
+          <label for="themeToggle">
+            <span>Dark Mode</span>
+          </label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="themeToggle" aria-label="Toggle dark mode" />
+            <span class="slider"></span>
+          </label>
+        </div>
+        <button onclick="handleLogout()" style="width: 100%; padding: 12px; border: none; border-radius: 12px; background: var(--danger); color: #fff; font-weight: 600; cursor: pointer; margin-top: 16px;">Logout</button>
+        <div class="card" style="padding: 18px; background: rgba(37, 99, 235, 0.08); border: none;">
+          <p style="margin: 0; font-weight: 700; color: #1d4ed8;">Student-friendly setup</p>
+          <p style="margin: 8px 0 0; color: var(--muted); font-size: 0.94rem;">This dashboard supports both frontend analytics and embedded report previews.</p>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section id="overview" class="page-header">
+        <div>
+          <h2>Overview</h2>
+          <p>Track balances, account health, spending trends, and budget progress in one clean dashboard.</p>
+        </div>
+      </section>
+
+      <section id="transactions" class="card">
+        <h4>Add Transaction</h4>
+        <p class="section-copy">Record a debit or credit and watch your balance update instantly.</p>
+        <form id="transactionForm" onsubmit="submitTransaction(event)" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:24px;">
+          <div><label style="display:block; margin-bottom:8px; font-weight:600; color:var(--text);">Account</label><select id="transactionAccount" name="account" required style="width:100%; border-radius:12px; border:1px solid var(--border); padding:12px; background:var(--panel); color:var(--text);"></select></div>
+          <div><label style="display:block; margin-bottom:8px; font-weight:600; color:var(--text);">Amount</label><input id="transactionAmount" name="amount" type="number" step="0.01" min="0" placeholder="0.00" required style="width:100%; border-radius:12px; border:1px solid var(--border); padding:12px; background:var(--panel); color:var(--text);" /></div>
+          <div><label style="display:block; margin-bottom:8px; font-weight:600; color:var(--text);">Type</label><select id="transactionType" name="type" required style="width:100%; border-radius:12px; border:1px solid var(--border); padding:12px; background:var(--panel); color:var(--text);"><option value="Credit">Credit</option><option value="Debit">Debit</option></select></div>
+          <div><label style="display:block; margin-bottom:8px; font-weight:600; color:var(--text);">Category</label><select id="transactionCategory" name="category" required style="width:100%; border-radius:12px; border:1px solid var(--border); padding:12px; background:var(--panel); color:var(--text);"><option value="Income">Income</option><option value="Entertainment">Entertainment</option><option value="Groceries">Groceries</option><option value="Travel">Travel</option><option value="Utilities">Utilities</option><option value="Other">Other</option></select></div>
+          <div style="grid-column: span 2;"><label style="display:block; margin-bottom:8px; font-weight:600; color:var(--text);">Description</label><input id="transactionDescription" name="description" type="text" placeholder="Add transaction details" style="width:100%; border-radius:12px; border:1px solid var(--border); padding:12px; background:var(--panel); color:var(--text);" /></div>
+          <button type="submit" style="border:none; border-radius:12px; padding:12px 22px; background: #2563eb; color:#fff; font-weight:600; cursor:pointer; align-self:flex-end;" >Add Transaction</button>
+        </form>
+        <p id="transactionStatus" style="margin:0; color:var(--muted); font-size:0.95rem;"></p>
+        
+        <h4 style="margin-top:24px; margin-bottom:12px;">Filter Transactions</h4>
+        <div class="filter-controls">
+          <select id="filterType" onchange="filterTransactions()" style="width:100%;">
+            <option value="">All Types</option>
+            <option value="Credit">Credit</option>
+            <option value="Debit">Debit</option>
+          </select>
+          <select id="filterCategory" onchange="filterTransactions()" style="width:100%;">
+            <option value="">All Categories</option>
+          </select>
+          <select id="filterSort" onchange="filterTransactions()" style="width:100%;">
+            <option value="date_desc">Newest</option>
+            <option value="date_asc">Oldest</option>
+            <option value="amount_desc">Amount: High to Low</option>
+            <option value="amount_asc">Amount: Low to High</option>
+          </select>
+          <input type="number" id="filterMinAmount" placeholder="Min Amount" onchange="filterTransactions()" min="0" step="0.01" />
+          <input type="number" id="filterMaxAmount" placeholder="Max Amount" onchange="filterTransactions()" min="0" step="0.01" />
+          <button onclick="resetFilters()" style="border:none; border-radius:12px; padding:10px 16px; background: #6b7280; color:#fff; font-weight:600; cursor:pointer; width:100%;">Reset</button>
+        </div>
+        
+        <h4 style="margin-top:24px; margin-bottom:12px;">Recent Transactions</h4>
+        <div class="mt-8 overflow-x-auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody id="transactionsTableBody"></tbody>
+          </table>
+        </div>
+        <div id="pagination" style="margin-top:16px; display:flex; justify-content:center; gap:8px;">
+          <button id="prevPage" onclick="prevPage()" style="border:none; border-radius:12px; padding:8px 16px; background:#6b7280; color:#fff; cursor:pointer;">Previous</button>
+          <button id="nextPage" onclick="nextPage()" style="border:none; border-radius:12px; padding:8px 16px; background:#2563eb; color:#fff; cursor:pointer;">Next</button>
+        </div>
+      </section>
+
+      <section id="accounts" class="card">
+        <h4>Account Management</h4>
+        <p class="section-copy">Add new accounts or update existing ones.</p>
+        <form id="accountForm" onsubmit="submitAccount(event)" style="display:grid; grid-template-columns: auto 1fr auto 1fr auto; gap:12px; margin-bottom:24px;">
+          <input id="accountName" name="name" type="text" placeholder="Account name" required style="border-radius:12px; border:1px solid var(--border); padding:12px; background:var(--panel); color:var(--text);" />
+          <select id="accountType" name="type" style="border-radius:12px; border:1px solid var(--border); padding:12px; background:var(--panel); color:var(--text);"><option value="Checking">Checking</option><option value="Savings">Savings</option><option value="Cash">Cash</option></select>
+          <input id="accountBalance" name="balance" type="number" step="0.01" min="0" placeholder="Balance" required style="border-radius:12px; border:1px solid var(--border); padding:12px; background:var(--panel); color:var(--text);" />
+          <button type="submit" style="border:none; border-radius:12px; padding:12px 22px; background: #2563eb; color:#fff; font-weight:600; cursor:pointer; grid-column:5;">Add Account</button>
+        </form>
+        <p id="accountStatus" style="margin:0 0 24px; color:var(--muted); font-size:0.95rem;"></p>
+        <div id="accountsContainer" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:18px;"></div>
+      </section>
+
+      <section id="budgets" class="card">
+        <h4>Budget Management</h4>
+        <p class="section-copy">Create and manage spending limits for each category.</p>
+        <form id="budgetForm" onsubmit="submitBudget(event)" style="display:grid; grid-template-columns: auto 1fr auto; gap:12px; margin-bottom:24px;">
+          <input id="budgetCategory" name="category" type="text" placeholder="New category" required style="border-radius:12px; border:1px solid var(--border); padding:12px; background:var(--panel); color:var(--text);" />
+          <input id="budgetLimit" name="limit" type="number" step="0.01" min="0" placeholder="Budget limit" required style="border-radius:12px; border:1px solid var(--border); padding:12px; background:var(--panel); color:var(--text);" />
+          <button type="submit" style="border:none; border-radius:12px; padding:12px 22px; background: #2563eb; color:#fff; font-weight:600; cursor:pointer;">Add Budget</button>
+        </form>
+        <p id="budgetStatus" style="margin:0 0 24px; color:var(--muted); font-size:0.95rem;"></p>
+        <div id="budgetsContainer" style="display:grid; gap:18px;"></div>
+      </section>
+
+      <section id="settings" class="card">
+        <h4>Settings</h4>
+        <p class="section-copy">Configure the dashboard experience and mobile-friendly controls.</p>
+        <div style="margin-top:18px; display:grid; gap:16px;">
+          <div class="toggle-card" style="padding:14px; background: var(--panel); border: 1px solid var(--border);">
+            <span>Dark Mode</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="themeToggleBottom" aria-label="Toggle dark mode" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-card" style="padding:14px; background: var(--panel); border: 1px solid var(--border);">
+            <span>Theme Style</span>
+            <select id="themeSelector" aria-label="Select dashboard theme" style="border-radius:12px; border:1px solid var(--border); padding:10px 12px; background:var(--panel); color:var(--text); width:100%;">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="ocean">Ocean</option>
+              <option value="sunset">Sunset</option>
+            </select>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; padding:14px 16px; background: var(--panel); border:1px solid var(--border); border-radius:18px;">
+            <div>
+              <strong style="display:block;">Compact Sidebar</strong>
+              <span style="color: var(--muted); font-size:0.95rem;">Quickly collapse the left menu.</span>
+            </div>
+            <button id="sidebarToggleSecondary" class="collapse-btn" style="width: 52px; height: 40px;">≡</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="scorecards">
+        <article class="card scorecard">
+          <small>Total Balance</small>
+          <h3 class="positive" id="totalBalance">₹0.00</h3>
+          <p style="margin:0;color:var(--muted);">Combined balance across all accounts.</p>
+        </article>
+        <article class="card scorecard">
+          <small>Credit Card Debt</small>
+          <h3 class="negative" id="creditCardDebt">₹0.00</h3>
+          <p style="margin:0;color:var(--muted);">Total revolving debt across all cards.</p>
+        </article>
+      </section>
+
+      <section class="chart-card card">
+        <div class="chart-inner">
+          <div class="chart-widget">
+            <div class="subtitle">
+              <span>This Month</span>
+              <span class="stat-pill">+18% vs last month</span>
+            </div>
+            <canvas id="donutThisMonth"></canvas>
+          </div>
+          <div class="chart-widget">
+            <div class="subtitle">
+              <span>Last Month</span>
+              <span class="stat-pill">+12% improvement</span>
+            </div>
+            <canvas id="donutLastMonth"></canvas>
+          </div>
+        </div>
+        <div class="chart-widget" style="margin-top:20px; padding:22px;">
+          <div class="subtitle">
+            <span>Category Comparison</span>
+            <span class="stat-pill">Overview by category</span>
+          </div>
+          <canvas id="categoryCompareChart"></canvas>
+        </div>
+        <div id="expenseLegend" class="mt-6 grid gap-3 sm:grid-cols-2"></div>
+      </section>
+
+      <section class="trend-layout">
+        <article class="card table-card">
+          <h4>All Accounts</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th>Type</th>
+                <th>Balance</th>
+              </tr>
+            </thead>
+            <tbody id="accountsTableBody"></tbody>
+          </table>
+        </article>
+
+        <article class="card progress-card">
+          <h4>Budget Progress</h4>
+          <div id="budgetProgressContainer" style="display:grid; gap:16px;"></div>
+        </article>
+      </section>
+
+      <section class="stats-row">
+        <article class="card chart-widget">
+          <div class="subtitle" style="margin-bottom: 20px;">
+            <span>Spending Trend</span>
+            <span class="stat-pill">60 days</span>
+          </div>
+          <canvas id="areaTrend"></canvas>
+        </article>
+      </section>
+
+      <section class="embed-card card">
+        <h4>Embedded Analytics</h4>
+        <iframe src="https://datastudio.google.com/embed/reporting/1a2345b6789cdef?hl=en" title="Looker Studio report placeholder"></iframe>
+      </section>
+    </main>
+  </div>
+
+  <script>
+// Global variables to store data
+let globalData = {};
+let filteredTransactions = [];
+let currentPage = 1;
+const itemsPerPage = 7;
+
+// Auth functions
+async function checkAuth() {
+    try {
+        const response = await fetch('/api/check-auth', { credentials: 'include' });
+        if (response.ok) {
+            document.getElementById('authContainer').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'grid';
+            initializeUI(); // This will also call loadDashboard()
+        } else {
+            document.getElementById('authContainer').style.display = 'flex';
+            document.getElementById('mainApp').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Auth check failed:', error);
+        document.getElementById('authContainer').style.display = 'flex';
+        document.getElementById('mainApp').style.display = 'none';
+    }
+}
+
+function switchToRegister(e) {
+    e.preventDefault();
+    document.getElementById('loginTab').classList.remove('active');
+    document.getElementById('registerTab').classList.add('active');
+}
+
+function switchToLogin(e) {
+    e.preventDefault();
+    document.getElementById('registerTab').classList.remove('active');
+    document.getElementById('loginTab').classList.add('active');
+}
+
+async function handleLogin(event) {
+    event.preventDefault();
+    const username = document.getElementById('loginUsername').value;
+    const password = document.getElementById('loginPassword').value;
+    const errorEl = document.getElementById('loginError');
+    errorEl.textContent = '';
+
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            errorEl.textContent = data.error || 'Login failed';
+            return;
+        }
+
+        document.getElementById('loginForm').reset();
+        checkAuth();
+    } catch (error) {
+        errorEl.textContent = 'Error during login';
+    }
+}
+
+async function handleRegister(event) {
+    event.preventDefault();
+    const username = document.getElementById('registerUsername').value;
+    const password = document.getElementById('registerPassword').value;
+    const confirm = document.getElementById('registerConfirm').value;
+    const errorEl = document.getElementById('registerError');
+    errorEl.textContent = '';
+
+    if (password !== confirm) {
+        errorEl.textContent = 'Passwords do not match';
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/register', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            errorEl.textContent = data.error || 'Registration failed';
+            return;
+        }
+
+        document.getElementById('registerForm').reset();
+        switchToLogin({preventDefault: () => {}});
+        checkAuth();
+    } catch (error) {
+        errorEl.textContent = 'Error during registration';
+    }
+}
+
+async function handleLogout() {
+    try {
+        await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+        checkAuth();
+    } catch (error) {
+        console.error('Logout failed:', error);
+        checkAuth();
+    }
+}
+
+// Call checkAuth on page load
+document.addEventListener('DOMContentLoaded', checkAuth);
+
+async function loadDashboard() {
+    try {
+        const response = await fetch('/api/overview?t=' + Date.now(), { credentials: 'include' });
+        if (!response.ok) throw new Error('Failed to load data');
+        const data = await response.json();
+        globalData = data;
+        filteredTransactions = data.recent_transactions;
+        currentPage = 1;
+        updateUI(data);
+    } catch (error) {
+        console.error('Dashboard load error:', error);
+    }
+}
+
+async function submitTransaction(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    const transactionData = {
+        amount: parseFloat(formData.get('amount')),
+        account_id: parseInt(formData.get('account')),
+        transaction_type: formData.get('type'),
+        category: formData.get('category'),
+        description: formData.get('description') || formData.get('category')
+    };
+
+    try {
+        const response = await fetch('/api/transaction', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(transactionData)
+        });
+
+        if (!response.ok) throw new Error('Server error');
+        const updatedData = await response.json();
+        globalData = updatedData;
+        filteredTransactions = updatedData.recent_transactions;
+        updateUI(updatedData);
+        form.reset();
+        document.getElementById('transactionStatus').textContent = 'Transaction added successfully!';
+        setTimeout(() => document.getElementById('transactionStatus').textContent = '', 3000);
+    } catch (error) {
+        console.error('Transaction error:', error);
+        document.getElementById('transactionStatus').textContent = error.message;
+    }
+}
+
+async function submitAccount(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    const accountData = {
+        name: formData.get('name'),
+        type: formData.get('type'),
+        balance: parseFloat(formData.get('balance'))
+    };
+
+    try {
+        const response = await fetch('/api/accounts', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(accountData)
+        });
+
+        if (!response.ok) throw new Error('Failed to add account');
+        const updatedData = await response.json();
+        globalData = updatedData;
+        populateDropdowns(updatedData);
+        loadDashboard();
+        form.reset();
+        document.getElementById('accountStatus').textContent = 'Account added successfully!';
+        setTimeout(() => document.getElementById('accountStatus').textContent = '', 3000);
+    } catch (error) {
+        document.getElementById('accountStatus').textContent = error.message;
+    }
+}
+
+async function submitBudget(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    const budgetData = {
+        category: formData.get('category'),
+        limit: parseFloat(formData.get('limit'))
+    };
+
+    try {
+        const response = await fetch('/api/budgets', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(budgetData)
+        });
+
+        if (!response.ok) throw new Error('Failed to add budget');
+        loadDashboard();
+        form.reset();
+        document.getElementById('budgetStatus').textContent = 'Budget added successfully!';
+        setTimeout(() => document.getElementById('budgetStatus').textContent = '', 3000);
+    } catch (error) {
+        document.getElementById('budgetStatus').textContent = error.message;
+    }
+}
+
+function populateDropdowns(data) {
+    // Populate Account Dropdown
+    const accountSelect = document.getElementById('transactionAccount');
+    accountSelect.innerHTML = '';
+    const accounts = data.accounts || [];
+    accounts.forEach(acc => {
+        const option = document.createElement('option');
+        option.value = acc.id;
+        option.text = acc.name + ' (₹' + acc.balance.toFixed(2) + ')';
+        accountSelect.appendChild(option);
+    });
+
+    // Populate Category Dropdown with all categories
+    const categorySelect = document.getElementById('transactionCategory');
+    const filterCategorySelect = document.getElementById('filterCategory');
+    const categories = ['Income', 'Entertainment', 'Groceries', 'Travel', 'Utilities', 'Other'];
+    const budgets = data.budgets || [];
+    
+    budgets.forEach(budget => {
+        if (!categories.includes(budget.category)) {
+            categories.push(budget.category);
+        }
+    });
+
+    categorySelect.innerHTML = '';
+    filterCategorySelect.innerHTML = '<option value="">All Categories</option>';
+    categories.forEach(cat => {
+        const option1 = document.createElement('option');
+        option1.value = cat;
+        option1.text = cat;
+        categorySelect.appendChild(option1);
+
+        const option2 = document.createElement('option');
+        option2.value = cat;
+        option2.text = cat;
+        filterCategorySelect.appendChild(option2);
+    });
+}
+
+function filterTransactions() {
+    const typeFilter = document.getElementById('filterType').value;
+    const categoryFilter = document.getElementById('filterCategory').value;
+    const sortType = document.getElementById('filterSort').value;
+    const minAmount = parseFloat(document.getElementById('filterMinAmount').value) || 0;
+    const maxAmount = parseFloat(document.getElementById('filterMaxAmount').value) || Infinity;
+
+    filteredTransactions = globalData.recent_transactions.filter(txn => {
+        return (!typeFilter || txn.transaction_type === typeFilter) &&
+               (!categoryFilter || txn.category === categoryFilter) &&
+               txn.amount >= minAmount &&
+               txn.amount <= maxAmount;
+    });
+
+    if (sortType === 'amount_asc') {
+        filteredTransactions.sort((a, b) => a.amount - b.amount);
+    } else if (sortType === 'amount_desc') {
+        filteredTransactions.sort((a, b) => b.amount - a.amount);
+    } else if (sortType === 'date_asc') {
+        filteredTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+    } else {
+        filteredTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+
+    currentPage = 1;
+    renderTransactions();
+}
+
+function resetFilters() {
+    document.getElementById('filterType').value = '';
+    document.getElementById('filterCategory').value = '';
+    document.getElementById('filterSort').value = 'date_desc';
+    document.getElementById('filterMinAmount').value = '';
+    document.getElementById('filterMaxAmount').value = '';
+    filteredTransactions = globalData.recent_transactions;
+    currentPage = 1;
+    renderTransactions();
+}
+
+function renderTransactions() {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const pageTransactions = filteredTransactions.slice(start, end);
+    const tbody = document.getElementById('transactionsTableBody');
+    tbody.innerHTML = '';
+    pageTransactions.forEach(txn => {
+        const row = document.createElement('tr');
+        const amountClass = txn.transaction_type === 'Credit' ? 'amt-credit' : 'amt-debit';
+        const amountSign = txn.transaction_type === 'Credit' ? '+' : '-';
+        row.innerHTML = `
+            <td>${new Date(txn.date).toLocaleDateString()}</td>
+            <td>${txn.description}</td>
+            <td>${txn.category}</td>
+            <td class="${amountClass}">${amountSign}₹${txn.amount.toFixed(2)}</td>
+        `;
+        tbody.appendChild(row);
+    });
+    updatePaginationButtons();
+}
+
+function updatePaginationButtons() {
+    const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+    document.getElementById('prevPage').disabled = currentPage === 1;
+    document.getElementById('nextPage').disabled = currentPage === totalPages;
+}
+
+function nextPage() {
+    const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+    if (currentPage < totalPages) {
+        currentPage++;
+        renderTransactions();
+    }
+}
+
+function prevPage() {
+    if (currentPage > 1) {
+        currentPage--;
+        renderTransactions();
+    }
+}
+
+function updateUI(data) {
+    // Populate dropdowns
+    populateDropdowns(data);
+
+    // Total Balance
+    document.getElementById('totalBalance').textContent = '₹' + data.total_balance.toFixed(2);
+    
+    // Credit Card Debt
+    document.getElementById('creditCardDebt').textContent = '₹' + data.credit_card_debt.toFixed(2);
+    
+    // Render Transactions with color coding
+    currentPage = 1;
+    renderTransactions();
+    
+    // Accounts Table
+    const accountsTbody = document.getElementById('accountsTableBody');
+    accountsTbody.innerHTML = '';
+    data.accounts.forEach(acc => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><div class="account-name"><span class="account-chip"></span>${acc.name}</div></td>
+            <td>${acc.type}</td>
+            <td>₹${acc.balance.toFixed(2)}</td>
+        `;
+        accountsTbody.appendChild(row);
+    });
+
+    const accountsContainer = document.getElementById('accountsContainer');
+    if (accountsContainer) {
+        accountsContainer.innerHTML = '';
+        data.accounts.forEach(acc => {
+            const card = document.createElement('div');
+            card.style.padding = '18px';
+            card.style.borderRadius = '18px';
+            card.style.background = 'var(--panel)';
+            card.style.boxShadow = '0 18px 45px rgba(15,23,42,0.06)';
+            card.innerHTML = `
+                <h4 style="margin:0 0 8px;">${acc.name}</h4>
+                <p style="margin:0 0 12px; color:var(--muted);">${acc.type}</p>
+                <p style="margin:0; font-size:1.05rem; font-weight:700;">₹${acc.balance.toFixed(2)}</p>
+            `;
+            accountsContainer.appendChild(card);
+        });
+    }
+    
+    // Budget Progress
+    const budgetContainer = document.getElementById('budgetProgressContainer');
+    budgetContainer.innerHTML = '';
+    data.budgets.forEach(budget => {
+        const div = document.createElement('div');
+        div.className = 'budget-row';
+        div.innerHTML = `
+            <p><strong>${budget.category}</strong> <span>₹${budget.spent.toFixed(2)} / ₹${budget.limit.toFixed(2)}</span></p>
+            <div class="progress"><span style="width: ${budget.percentage}%"></span></div>
+        `;
+        budgetContainer.appendChild(div);
+    });
+
+    const budgetsContainer = document.getElementById('budgetsContainer');
+    if (budgetsContainer) {
+        budgetsContainer.innerHTML = '';
+        data.budgets.forEach(budget => {
+            const card = document.createElement('div');
+            card.style.padding = '18px';
+            card.style.borderRadius = '18px';
+            card.style.background = 'var(--panel)';
+            card.style.boxShadow = '0 18px 45px rgba(15,23,42,0.06)';
+            card.innerHTML = `
+                <h4 style="margin:0 0 8px;">${budget.category}</h4>
+                <p style="margin:0 0 12px; color:var(--muted);">Limit: ₹${budget.limit.toFixed(2)}</p>
+                <p style="margin:0; font-weight:700;">Used: ₹${budget.spent.toFixed(2)} (${budget.percentage.toFixed(0)}%)</p>
+            `;
+            budgetsContainer.appendChild(card);
+        });
+    }
+    
+    // Charts
+    drawCharts(data);
+}
+
+function calculateMonthComparison(data) {
+    // Calculate this month total
+    const thisMonthExpenses = (data.expense_breakdown || []).reduce((sum, e) => sum + e.amount, 0);
+    
+    // Calculate last month total
+    const lastMonthExpenses = (data.last_month_expenses || []).reduce((sum, e) => sum + e.amount, 0);
+    
+    // Calculate percentage improvement/increase
+    const improvement = lastMonthExpenses > 0 
+        ? ((thisMonthExpenses - lastMonthExpenses) / lastMonthExpenses * 100).toFixed(1)
+        : 0;
+    
+    const isIncrease = improvement > 0;
+    
+    return {
+        thisMonthExpenses,
+        lastMonthExpenses,
+        improvement: Math.abs(improvement),
+        isIncrease,
+        thisMonthPercent: isIncrease ? '+' + improvement + '%' : improvement + '%',
+        lastMonthPercent: isIncrease ? '-' + Math.abs(improvement) + '%' : '+' + Math.abs(improvement) + '%'
+    };
+}
+
+function drawCharts(data) {
+    const comparison = calculateMonthComparison(data);
+
+    // Update the comparison stats
+    const thisMonthStat = document.querySelector('.chart-inner .chart-widget:nth-child(1) .subtitle .stat-pill');
+    const lastMonthStat = document.querySelector('.chart-inner .chart-widget:nth-child(2) .subtitle .stat-pill');
+
+    if (thisMonthStat) thisMonthStat.textContent = comparison.thisMonthPercent + ' vs last month';
+    if (lastMonthStat) lastMonthStat.textContent = comparison.isIncrease ? comparison.improvement + '% more' : comparison.improvement + '% less';
+
+    if (window.chart1) window.chart1.destroy();
+    if (window.chart2) window.chart2.destroy();
+    if (window.chart3) window.chart3.destroy();
+    if (window.chart4) window.chart4.destroy();
+
+    const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#FF6B9D', '#C44569'];
+    const expenseBreakdown = data.expense_breakdown || [];
+    const lastMonthExpenses = data.last_month_expenses || [];
+
+    const categorySet = new Set([...expenseBreakdown.map(e => e.category), ...lastMonthExpenses.map(e => e.category)]);
+    const categories = Array.from(categorySet);
+    const categoryColors = categories.map((cat, idx) => colors[idx % colors.length]);
+    const thisMonthData = categories.map(cat => {
+        const item = expenseBreakdown.find(e => e.category === cat);
+        return item ? item.amount : 0;
+    });
+    const lastMonthData = categories.map(cat => {
+        const item = lastMonthExpenses.find(e => e.category === cat);
+        return item ? item.amount : 0;
+    });
+
+    const expenseLegend = document.getElementById('expenseLegend');
+    expenseLegend.innerHTML = '';
+    categories.forEach((category, idx) => {
+        const legendItem = document.createElement('div');
+        legendItem.style.display = 'flex';
+        legendItem.style.alignItems = 'center';
+        legendItem.style.gap = '10px';
+        legendItem.innerHTML = `
+            <span style="width:12px; height:12px; border-radius:50%; background:${categoryColors[idx]}; display:inline-block;"></span>
+            <span>${category}: ₹${thisMonthData[idx].toFixed(2)} / ₹${lastMonthData[idx].toFixed(2)}</span>
+        `;
+        expenseLegend.appendChild(legendItem);
+    });
+
+    const ctx1 = document.getElementById('donutThisMonth').getContext('2d');
+    window.chart1 = new Chart(ctx1, {
+        type: 'doughnut',
+        data: {
+            labels: expenseBreakdown.map(e => e.category),
+            datasets: [{
+                data: expenseBreakdown.map(e => e.amount),
+                backgroundColor: expenseBreakdown.map((_, idx) => colors[idx % colors.length])
+            }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+    });
+
+    const ctx2 = document.getElementById('donutLastMonth').getContext('2d');
+    window.chart2 = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+            labels: lastMonthExpenses.map(e => e.category),
+            datasets: [{
+                data: lastMonthExpenses.map(e => e.amount),
+                backgroundColor: lastMonthExpenses.map((_, idx) => colors[idx % colors.length])
+            }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+    });
+
+    const ctx4 = document.getElementById('categoryCompareChart').getContext('2d');
+    window.chart4 = new Chart(ctx4, {
+        type: 'bar',
+        data: {
+            labels: categories,
+            datasets: [
+                {
+                    label: 'This Month',
+                    data: thisMonthData,
+                    backgroundColor: categoryColors.map(color => hexToRGBA(color, 0.8))
+                },
+                {
+                    label: 'Last Month',
+                    data: lastMonthData,
+                    backgroundColor: categoryColors.map(color => hexToRGBA(color, 0.4))
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'top' }
+            },
+            scales: {
+                y: { beginAtZero: true },
+                x: { ticks: { autoSkip: false, maxRotation: 0, minRotation: 0 } }
+            }
+        }
+    });
+
+    const ctx3 = document.getElementById('areaTrend').getContext('2d');
+    const balanceHistory = data.balance_history || [];
+    window.chart3 = new Chart(ctx3, {
+        type: 'line',
+        data: {
+            labels: balanceHistory.map(h => new Date(h.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
+            datasets: [{
+                label: 'Balance',
+                data: balanceHistory.map(h => h.balance),
+                fill: true,
+                backgroundColor: 'rgba(37, 99, 235, 0.15)',
+                borderColor: '#2563eb',
+                tension: 0.35,
+                pointRadius: 3,
+                pointBackgroundColor: '#2563eb'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+}
+
+function hexToRGBA(hex, alpha) {
+    const normalized = hex.replace('#', '');
+    const bigint = parseInt(normalized, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function applyTheme(theme) {
+    document.body.setAttribute('data-theme', theme);
+    const themeToggle = document.getElementById('themeToggle');
+    const themeToggleBottom = document.getElementById('themeToggleBottom');
+    const themeSelector = document.getElementById('themeSelector');
+
+    if (themeToggle) {
+        themeToggle.checked = theme === 'dark';
+    }
+    if (themeToggleBottom) {
+        themeToggleBottom.checked = theme === 'dark';
+    }
+    if (themeSelector) {
+        themeSelector.value = theme;
+    }
+}
+
+// Theme toggle
+const topThemeToggle = document.getElementById('themeToggle');
+if (topThemeToggle) {
+    topThemeToggle.addEventListener('change', function() {
+        applyTheme(this.checked ? 'dark' : 'light');
+    });
+}
+
+const bottomThemeToggle = document.getElementById('themeToggleBottom');
+if (bottomThemeToggle) {
+    bottomThemeToggle.addEventListener('change', function() {
+        applyTheme(this.checked ? 'dark' : 'light');
+    });
+}
+
+const themeSelector = document.getElementById('themeSelector');
+if (themeSelector) {
+    themeSelector.addEventListener('change', function() {
+        applyTheme(this.value);
+    });
+}
+
+function initializeUI() {
+    // Set up all event listeners for forms
+    const transactionForm = document.getElementById('transactionForm');
+    if (transactionForm) {
+        transactionForm.onsubmit = submitTransaction;
+    }
+
+    const accountForm = document.getElementById('accountForm');
+    if (accountForm) {
+        accountForm.onsubmit = submitAccount;
+    }
+
+    const budgetForm = document.getElementById('budgetForm');
+    if (budgetForm) {
+        budgetForm.onsubmit = submitBudget;
+    }
+
+    // Load initial data
+    loadDashboard();
+}
+
+// Sidebar toggle
+const sidebarToggle = document.getElementById('sidebarToggle');
+if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', function() {
+        document.body.classList.toggle('sidebar-collapsed');
+    });
+}
+
+const sidebarToggleSecondary = document.getElementById('sidebarToggleSecondary');
+if (sidebarToggleSecondary) {
+    sidebarToggleSecondary.addEventListener('click', function() {
+        document.body.classList.toggle('sidebar-collapsed');
+    });
+}
+
+// Load dashboard on page load
+window.onload = function() {
+    applyTheme(document.getElementById('themeSelector')?.value || 'light');
+};
+  </script>
+</body>
+</html>
