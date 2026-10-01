@@ -1,7 +1,9 @@
-# server.py - Enhanced Finance Backend with User Authentication
 import os
 import sqlite3
+import uuid
+import threading
 from datetime import datetime, timedelta
+import math
 from flask import Flask, jsonify, request, render_template, session
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -176,6 +178,59 @@ def init_db():
     conn.close()
 
 # Helper functions
+def cleanup_user(conn, user_id):
+    """Deletes all data for a specific user ID."""
+    conn.execute("DELETE FROM balance_history WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM credit_cards WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM budgets WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM transactions WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM accounts WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+def cleanup_old_demo_sessions():
+    """Background task to remove demo sessions older than 4 hours to prevent DB bloat."""
+    def _cleanup():
+        conn = get_db_connection()
+        cutoff = (datetime.utcnow() - timedelta(hours=4)).isoformat()
+        old_users = conn.execute("SELECT id FROM users WHERE username LIKE 'demo_session_%' AND created_at < ?", (cutoff,)).fetchall()
+        for u in old_users:
+            cleanup_user(conn, u['id'])
+        conn.commit()
+        conn.close()
+    
+    threading.Thread(target=_cleanup).start()
+
+def clone_demo_data(conn, source_id, dest_id):
+    """Clones all financial data from the master demo user to a target user session."""
+    accounts = conn.execute("SELECT * FROM accounts WHERE user_id = ?", (source_id,)).fetchall()
+    account_mapping = {}
+    for account in accounts:
+        cur = conn.execute("INSERT INTO accounts (user_id, name, type, balance) VALUES (?, ?, ?, ?)", 
+                           (dest_id, account['name'], account['type'], account['balance']))
+        account_mapping[account['id']] = cur.lastrowid
+
+    transactions = conn.execute("SELECT * FROM transactions WHERE user_id = ?", (source_id,)).fetchall()
+    for txn in transactions:
+        new_account_id = account_mapping.get(txn['account_id'])
+        if new_account_id:
+            conn.execute("INSERT INTO transactions (user_id, account_id, amount, transaction_type, category, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                         (dest_id, new_account_id, txn['amount'], txn['transaction_type'], txn['category'], txn['description'], txn['created_at']))
+
+    budgets = conn.execute("SELECT * FROM budgets WHERE user_id = ?", (source_id,)).fetchall()
+    for b in budgets:
+        conn.execute("INSERT INTO budgets (user_id, category, limit_amount, spent_amount, created_at) VALUES (?, ?, ?, ?, ?)",
+                     (dest_id, b['category'], b['limit_amount'], b['spent_amount'], b['created_at']))
+
+    cards = conn.execute("SELECT * FROM credit_cards WHERE user_id = ?", (source_id,)).fetchall()
+    for c in cards:
+        conn.execute("INSERT INTO credit_cards (user_id, card_name, debt_amount, credit_limit, interest_rate, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                     (dest_id, c['card_name'], c['debt_amount'], c['credit_limit'], c['interest_rate'], c['updated_at']))
+
+    history = conn.execute("SELECT * FROM balance_history WHERE user_id = ?", (source_id,)).fetchall()
+    for h in history:
+        conn.execute("INSERT INTO balance_history (user_id, snapshot_date, total_balance) VALUES (?, ?, ?)",
+                     (dest_id, h['snapshot_date'], h['total_balance']))
+
 def get_current_user_id():
     """Get current user ID from session."""
     return session.get('user_id')
@@ -246,7 +301,7 @@ def register():
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    """Login user."""
+    """Login user, provisioning a sandbox session if it is a demo account."""
     data = request.get_json()
     username = data.get('username', '').strip()
     password = data.get('password', '').strip()
@@ -256,17 +311,42 @@ def login():
 
     conn = get_db_connection()
     user = conn.execute("SELECT id, password FROM users WHERE username = ?", (username,)).fetchone()
-    conn.close()
 
     if not user or not check_password_hash(user['password'], password):
+        conn.close()
         return jsonify({'error': 'Invalid username or password'}), 401
-
-    session['user_id'] = user['id']
+    
+    if username.lower() == 'demo':
+        # Trigger background cleanup of old sessions
+        cleanup_old_demo_sessions()
+        
+        # Provision isolated demo session
+        session_username = f"demo_session_{uuid.uuid4().hex}"
+        cur = conn.execute(
+            "INSERT INTO users (username, password, created_at) VALUES (?, ?, ?)",
+            (session_username, generate_password_hash('ephemeral'), datetime.utcnow().isoformat())
+        )
+        new_demo_id = cur.lastrowid
+        clone_demo_data(conn, user['id'], new_demo_id)
+        conn.commit()
+        session['user_id'] = new_demo_id
+    else:
+        session['user_id'] = user['id']
+        
+    conn.close()
     return jsonify({'success': True, 'message': 'Login successful'}), 200
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
-    """Logout user."""
+    """Logout user and immediately drop demo sandbox if applicable."""
+    user_id = session.get('user_id')
+    if user_id:
+        conn = get_db_connection()
+        user = conn.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()
+        if user and user['username'].startswith('demo_session_'):
+            cleanup_user(conn, user_id)
+            conn.commit()
+        conn.close()
     session.clear()
     return jsonify({'success': True, 'message': 'Logged out'}), 200
 
@@ -373,39 +453,86 @@ def add_transaction():
         return jsonify({'error': 'Not authenticated'}), 401
 
     data = request.get_json()
-    amount = float(data.get('amount', 0))
+    try:
+        amount = float(data.get('amount', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Amount must be a valid number'}), 400
+        
     account_id = int(data.get('account_id', 2))
     transaction_type = data.get('transaction_type', 'Debit')
     category = data.get('category', 'General')
     description = data.get('description', '')
 
-    if amount <= 0:
-        return jsonify({'error': 'Amount must be greater than zero'}), 400
+    if amount <= 0 or math.isnan(amount) or math.isinf(amount):
+        return jsonify({'error': 'Amount must be a valid positive number'}), 400
 
     conn = get_db_connection()
+    conn.isolation_level = 'EXCLUSIVE'
     cur = conn.cursor()
+    
+    try:
+        cur.execute("BEGIN EXCLUSIVE")
+        # Check actual balance first and lock DB
+        cur.execute("SELECT name, balance FROM accounts WHERE id = ? AND user_id = ?", (account_id, user_id))
+        row = cur.fetchone()
+        if not row:
+            conn.rollback()
+            return jsonify({'error': 'Account not found'}), 404
+            
+        current_balance = float(row['balance'])
+        account_name = row['name']
+        
+        if transaction_type == 'Debit' and current_balance < amount:
+            shortfall = amount - current_balance
+            
+            # Find eligible alternate accounts
+            cur.execute("SELECT id, name, balance FROM accounts WHERE user_id = ? AND type != 'Credit Card' AND id != ? AND balance >= ? ORDER BY balance DESC", (user_id, account_id, amount))
+            alternatives = []
+            for alt in cur.fetchall():
+                alternatives.append({
+                    'id': alt['id'],
+                    'name': alt['name'],
+                    'balance': float(alt['balance'])
+                })
+                
+            conn.rollback()
+            conn.close()
+            
+            return jsonify({
+                'success': False,
+                'error': 'INSUFFICIENT_FUNDS',
+                'message': f"Insufficient funds. You are trying to debit ₹{amount:,.2f}, but the selected account has only ₹{current_balance:,.2f} available.",
+                'requestedAmount': amount,
+                'availableBalance': current_balance,
+                'shortfall': shortfall,
+                'suggestedAccounts': alternatives
+            }), 400
 
-    # Update account balance
-    if transaction_type == 'Credit':
-        cur.execute("UPDATE accounts SET balance = balance + ? WHERE id = ? AND user_id = ?", (amount, account_id, user_id))
-    else:
-        cur.execute("UPDATE accounts SET balance = balance - ? WHERE id = ? AND user_id = ?", (amount, account_id, user_id))
+        # Update account balance
+        if transaction_type == 'Credit':
+            cur.execute("UPDATE accounts SET balance = balance + ? WHERE id = ? AND user_id = ?", (amount, account_id, user_id))
+        else:
+            cur.execute("UPDATE accounts SET balance = balance - ? WHERE id = ? AND user_id = ?", (amount, account_id, user_id))
 
-    # Add transaction record
-    created_at = datetime.utcnow().isoformat()
-    cur.execute(
-        "INSERT INTO transactions (user_id, account_id, amount, transaction_type, category, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (user_id, account_id, amount, transaction_type, category, description, created_at)
-    )
-
-    # Update budget spent amount if debit
-    if transaction_type == 'Debit':
+        # Add transaction record
+        created_at = datetime.utcnow().isoformat()
         cur.execute(
-            "UPDATE budgets SET spent_amount = spent_amount + ? WHERE user_id = ? AND category = ?",
-            (amount, user_id, category)
+            "INSERT INTO transactions (user_id, account_id, amount, transaction_type, category, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (user_id, account_id, amount, transaction_type, category, description, created_at)
         )
 
-    conn.commit()
+        # Update budget spent amount if debit
+        if transaction_type == 'Debit':
+            cur.execute(
+                "UPDATE budgets SET spent_amount = spent_amount + ? WHERE user_id = ? AND category = ?",
+                (amount, user_id, category)
+            )
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': str(e)}), 500
     update_balance_history(user_id)
 
     # Fetch updated overview
@@ -685,4 +812,4 @@ def update_credit_card(card_id):
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5001)
